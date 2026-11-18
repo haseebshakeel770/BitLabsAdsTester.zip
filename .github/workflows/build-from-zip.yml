@@ -14,7 +14,6 @@ jobs:
       - name: Unzip project
         run: |
           ZIP=$(ls *.zip | head -n 1)
-          echo "Using ZIP: $ZIP"
           mkdir -p project
           unzip -q "$ZIP" -d project
           SETTINGS=$(find project -name settings.gradle.kts | head -n 1)
@@ -35,7 +34,23 @@ jobs:
 
       - name: Build debug APK
         working-directory: ${{ env.PROJECT_DIR }}
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --console=plain 2>&1 | tee build.log
+
+      - name: Show real errors
+        if: failure()
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          echo '### Build errors' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -nE "^e: |What went wrong|Could not |error:|Unresolved|requires|minCompileSdk" -A4 build.log | head -60 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ${{ env.PROJECT_DIR }}/build.log
 
       - uses: actions/upload-artifact@v4
         with:
